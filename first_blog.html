@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    
+
+    <title>First</title>
+    <link rel="stylesheet" type ="text/css" href = "first.css">
+</head>
+<body>
+    <div class="header">
+        <h1 style="color:blue;text-align:center;">Resolving a minor turkey day networking mystery</h1>
+        <p id = "date"style="text-align: right;">
+            <time>Wednesday, January 15, 2020</time>
+        </p>
+    </div>            
+            <a href = "http://localhost:8001">Back</a>
+            
+
+       
+             
+
+        <section style="text-align: center; margin-left: 150px;margin-right: 150px; margin-block-end: 50px;margin-bottom: 150px;">    
+              <p>  One of the things about this time of year is that I get to play sysadmin for far-flung parts of the extended family "network" which I normally can't lay hands on directly. This is when everyone gets their updates, security patches, and random wacky devices installed and set up.
+
+                This means there are some long-standing mysteries which I only really get a chance to poke at once a year, and frequently only from a smart phone. You can't do the full suite of poking and prodding, so it can be less than satisfying.
+                
+                This year, however, I managed to figure one out.</p>
+                
+                <p>There's been this one location that has never been able to load up the normal DOCSIS status page which is usually served over http from 192.168.100.1, port 80. Port 443 also hangs. However, port 8080, which seems to be something else entirely (the spectrum analyzer)? That works great.
+                
+                This has been the situation for a while... but this year, I have my actual laptop along, and my brain is back online, having not been recently drained of energy by a regular 9-5 situation. It was time to get into their gateway device and do some tcpdumping.
+                
+                I've replaced actual values with some placeholders below.
+                </p>
+                <p>
+                GW_MAC - the hardware address of their router/gateway box (embedded Linux)
+                GW_PUBIP - the public IPv4 address of that same box
+                ISP_MAC - the hardware address of some device at the ISP which you get back when you do an ARP request for the default IP address their DHCP server hands you
+                CM_MAC - the hardware address of their cable modem. Well, one of them at least. (more on this later)
+                WTF_MAC - another hardware address used by the cable modem
+                First, let's look at what works: port 8080.
+                </p>
+                <p>
+                20:52:35.490717 GW_MAC > ISP_MAC, ethertype IPv4 (0x0800), length 74: GW_PUBIP.60683 > 192.168.100.1.8080: Flags [S], seq 1736857109, win 14600, options [mss 1460,sackOK,TS val 608614883 ecr 0,nop,wscale 6], length 0
+                
+                Here's our SYN going out, and it's going to the ISP's gateway based on the hardware address, unsurprisingly, since 192.168.100.1 is not a local address. However, the cable modem grabs onto it and responds from its own hardware address:
+                
+                20:52:35.492376 CM_MAC > GW_MAC, ethertype IPv4 (0x0800), length 74: 192.168.100.1.8080 > GW_PUBIP.60683: Flags [S.], seq 2438961944, ack 1736857110, win 17376, options [mss 1464,nop,wscale 0,nop,nop,TS val 3992162 ecr 608614883], length 0
+                
+                The rest goes as you would expect and works fine. Where it gets wacky and weird is when you try to hit ports 80 or 443, and it ends up doing something like this. First, the outgoing SYN, which is otherwise just like the one to port 8080:
+                
+                20:54:36.593655 GW_MAC > ISP_MAC, ethertype IPv4 (0x0800), length 74: GW_PUBIP.40216 > 192.168.100.1.80: Flags [S], seq 1269309359, win 14600, options [mss 1460,sackOK,TS val 608626994 ecr 0,nop,wscale 6], length 0
+                
+                Do we get a SYN/ACK back? No. We get ... this:
+                </p>
+                <p>
+                20:54:36.595446 WTF_MAC > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 60: Request who-has GW_PUBIP tell 192.168.0.1, length 46
+                
+                Some completely new Ethernet address we've not seen before this point (with a unique OUI) comes up on the network and starts demanding that someone tell it the hardware address of the host which just poked it with a SYN. Even though, you know, that host can poke port 8080 on there and NOT generate the same response.
+                
+                Also, what's this 192.168.0.1 business? That's no IP address that anyone at this site has deliberately put on that cable modem. I sure didn't put it there. It just decided to make that ARP request and use that as the "who's calling" source address.
+                
+                Unfortunately, Linux cares about these things. It looks at that, and thinks, hey, 192.168.0.1, I have a route for you... down the INTERNAL interface (you know, the one facing the family's devices in NAT-land). But you just spoke to me on the external interface. You're a fake! Or a spy! Or something else evil. I hate you and I'm going to ignore you.
+                
+                And so it does, but not before logging something about it:
+                </p>
+                <p>
+                (date) (time) (hostname) kernel: IPv4: martian source GW_PUBIP from 192.168.0.1, on dev eth0 
+                (date) (time) (hostname) kernel: ll header: 00000000: ff ff ff ff ff ff (WTF_MAC) 08 06 ..............
+                
+                The cable modem never gets an answer, so it can't direct the SYN/ACK anywhere, and so the TCP connection never comes up.
+                
+                After spotting this, I tried a variant on my stupid network tricks from years ago and pointed 192.168.0.1 (which is unused on the "real" internal network) back OUT to the cable modem. I did all of the fakery from that old post, and ... it worked!
+                
+                In preparing this post tonight, I came back to it and realized that's even easier than that. You just need to make sure you have a route for that host pointing back out that way, and so you can get away with just this:
+                
+                route add -host 192.168.0.1 gw default.ip.from.isp
+                </p>
+                <p>
+                Basically, look up whatever IPv4 address your ISP handed you as a default gateway (presumably via DHCP), and jam in a /32 route for it out that pipe. Linux will match that against the incoming ARP request, figure it's not a martian, and will answer. Everything else just works.
+                
+                I should point out that this effectively kills any opportunity to use that IP address on your internal network. If you actually had your router/gateway itself there, this won't work. Fortunately, the site in question had a bit of sanity and had it somewhere else already.
+                
+                It's interesting to note that this only bites you if a whole bunch of things are true.
+                </p>
+                <p>
+                First, you need the specific cable modem model which has this weird behavior, in this case an Arris SB8200. (It may also involve specific firmwares, but that's not exactly a trivial thing to test considering how DOCSIS devices work.)
+                
+                Second, you need a box that does "martian filtering", i.e., reverse-path checks to see if a source is down the same interface it'd use to deliver a packet.
+                
+                Next, you have to have some networking scheme whereby 192.168.0.1/32 is seen as being on the inside of your network, thus triggering the "martian" scenario.
+                
+                Change models, gateways, or IPv4 networking schemes, and odds are you'll never see this.
+                
+                It remains to be seen why the cable modem behaves this way. My guess, knowing very little about the innards of such beasts, is that maybe they have two different IP stacks in there, and they don't play by the same rules. It's a pretty stark difference in behavior when you go from ports 80/443 to 8080. It's almost like there are multiple tiny embedded devices all trying to serve bits of the TCP port space on 192.168.100.1 and they all have their own ideas about how to handle layer 2 stuff.
+                
+                Can we get going with IPv6 for this kind of stuff already? This death-to-my-sanity-by-RFC-1918-conflicts business in IPv4 isn't fun any more.
+                
+                I really hope you didn't need to know any of this.
+                
+                ...
+                </p>
+                <p>
+                Epilogue: in the time since I did my first investigation and now, something about "WTF_MAC" changed. Comparing my notes, I can see that both are the OUI of 02:10:18, but the last 24 bits changed. So, not only is it some wacky address that doesn't match the "normal" part of the cable modem, it doesn't even stay the same!
+                
+                Is this some Broadcom placeholder thing? Information about that OUI online is sketchy at best. There aren't that many starting with "02", either. I hadn't seen that since my ancient 3com ISA cards back when I first got into this stuff.
+                
+                So weird.
+                </p>
+                More writing | Contact / send feedback
+            </section>
+        <a href = "http://localhost:8000"  style="text-align: right;">Back</a>
+</body>
+</html>
+
+
+

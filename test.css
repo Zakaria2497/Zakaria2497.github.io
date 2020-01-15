@@ -1,0 +1,41 @@
+#green {
+    width: 49%;
+    height: 100vh;
+    border: 1px ;
+    float: left;
+    margin: 1px;
+    margin-right: -10px;
+}
+#red {
+    width: 49%;
+    height:100vh;
+    border: 1px ;
+    margin: 1px;
+    float: right;
+    color:rgb(59, 152, 189);
+    text-align:center;    
+    margin-left: -20px;
+
+}
+
+#main{
+    width: 90vw;
+    height: 80vh;
+    margin:100px 100px 200px 50px;
+
+}
+
+
+#img1{
+    width:100%;
+    height:80%;
+    border-radius: 5px;
+}
+#date{
+    width:100%;
+    height: 20px;
+    /* border:1px solid red; */
+    /* background-color: aqua; */
+    margin-top: 2px;
+}
+

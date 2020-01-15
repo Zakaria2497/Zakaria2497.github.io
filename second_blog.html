@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Story</title>
+</head>
+<body>
+        <h1 style="color:green; text-align:center;">That packet looks familiar, and that one, and that one</h1>
+        <a href = "http://localhost:8000">Back</a>
+
+        <p style="text-align: center;"text-ali>
+                Sometimes I tell stories about service outages from the point of view of it having already happened, and provide this kind of "omniscient narrator" perspective as it goes along. I can tell you to look out for things, since they'll come in handy later, and so on.
+
+                Other times, I try to present them in much the same way that they happened, complete with the whole "fog of war" thing that goes with being in the moment. This is where you can't see obvious things that are right in front of you because they seem too ridiculous to contemplate.
+                
+                This is one of the latter, based on multiple events I've lived through. Yes, multiple: it's happened at several distinct companies that I've either worked for, contracted for, heard in stories from friends, or read somewhere over the years.
+                
+                So, let's dive in.
+                
+                You're at work at the office. It's a normal business day. Lots of other people are also at the office, doing their regular jobs. Much of this work involves poking at vaguely Unix-flavored boxes which are not physically on the premises. They're somewhere relatively far away, and so you have to telnet, ssh, or whatever to get to them. The point is, you're having to cross at least one "WAN" link to reach these things.
+                
+                Things are going okay. But then it seems like everything is getting slower and slower. Interactive connections are lagging: keystrokes don't echo back quickly any more. Web browsing and other "batch" network stuff is dragging: the "throbber" in the browser is busy for far too long for ordinary activities. The chat system gets slower and slower.
+                
+                You manage to hear from other people via the chat system ever so briefly. Some of them are seeing it as well. Others aren't sure, but at least you know it's not just you.
+                
+                Over the next minute or so, the whole thing grinds to a halt. EVERYTHING is now dead. Nothing's working.
+                
+                Depending on what decade it is, you whip out a modem and dial back in to the corporate network remote access pool, jump on the guest wireless network, or start tethering through your cell phone and get back in touch with whoever managed to stay online. You find others who have done the same thing, and it's clear there's a very big problem, but only where you are. The rest of the organization's offices are fine, but everything where you are is toast.
+                
+                Someone immediately thinks it's the link to the Internet and picks up the phone to the ISP to yell at them, because it has to be them. It's the network. It's always the network. Particularly when there's someone else to yell at, right? That happens in the background.
+                
+                Maybe an hour into this, someone unrelated to the problem but who knows their way around a network makes a curious observation: they have a hard-wired connection, and they are seeing a LOT of crazy traffic going past their host. It's way more multicast and broadcast traffic than they are used to. (Apparently, they have done this before, and have their own internal metric for what "normal" is, which is particularly valuable now. Otherwise, how would they know?) Hooray for tcpdump!
+                
+                Some of the broadcast traffic identifies its origin. More than just a MAC address or a source IP address, some of it (depending on the decade again) is NetBIOS over TCP/IP broadcasts, or MDNS broadcasts, or whatever, and they helpfully have the names of the hosts embedded. These are workstations, and they include some aspect of the human user's unixname, so you can go "oh, that's so and so".
+                
+                Did that person just unleash a hell torrent on the network? Better go check. They're right around the corner on the same floor, so why not? You get there, and they're very friendly, and no, they aren't doing anything funny. Their host DOES have the IP address and MAC address corresponding to some of the packets flying past the other box over and over, but they swear up and down they didn't do anything.
+                
+                You ask nicely if they'll disable their network interface(s) temporarily just for a while to attempt isolating things, and they agree. They even do you one better and power the whole machine off and will leave it off until you give the all-clear. They even unplug the network cable(s) to thwart any Wake-on-LAN magic. There's no way it's going to cause you any trouble now.
+                
+                You walk back around the corner to the first person's machine where they spotted all of of the bcast/mcast traffic, expecting it to have subsided. It hasn't. Indeed, it's still running full tilt, and then you notice in the spew that the host you just disabled is still in the packet traces. This box has its NICs disabled, is unplugged from the hard-wired network AND is powered off... and yet there are Ethernet frames going by which claim to be from it.
+                
+                At this point, people who have lived through this before probably know what happened. They might not know how, or why it was able to happen, but somewhere deep down inside, they have this sinking feeling that someone did something terrible to the network and this is how it's manifesting.
+                
+                The story diverges from here based on which version of it I've either lived through or heard about, but it goes along similar lines in any case.
+                
+                Someone introduced a loop to the network. The most likely case is that a person showed up in the morning and went crawling under their desk to plug something in, like a power cord. Maybe it "came unplugged" overnight or over the weekend, and they're fixing it.
+                
+                Then, while they're down there, they see this random Ethernet patch cable just kind of hanging out on the floor. It looks like it should be plugged in to one of the ports down there, but it's not. They plug it in to "do that person a solid" so they don't have to waste time also dealing with unplugged stuff.
+                
+                Of course, as it turned out, the loose cable end was one that was ON TOP of a desk, and had fallen down. It was the end that went into a computer, and did not need to be plugged "back in"... for the other end of that same cable was already plugged into a port!
+                
+                Taking that cable and jamming it into another port introduced a loop.
+                
+                Again, here, a bunch of people are jumping up and down, looking for the comment form, or popping back to the Hacker News tab to say something. Patience. We'll get there.
+                
+                Radia Perlman figured this out a long time ago. It's called spanning-tree protocol, and it's how your network can detect and defend against such clownery as someone looping it back onto itself.
+                
+                But, again, the story branches. One time, it didn't exist yet in the networking equipment at the company. Another time, it did, but the people running the network had no idea what it was, or why they'd use it. A third time, they knew about it and decided to "not use it" since "nobody here is that stupid". Yet another time, they had just turned it off days earlier because "it was breaking stuff, and things were fine without it".
+                
+                For the benefit of those who haven't lived through it yet, here's what happens. Let's take a simple loop where you've managed to plug two ports on the same switch into each other. We'll say that ports 15 and 16 are looped back.
+                
+                Someone, somewhere, sends out a broadcast, multicast, or possibly even a unicast packet (for a destination not yet mapped to a port). The switch (or hub, if you're "back in the day"...) takes that packet and floods it out to all ports except the one where it came from. Maybe it came from its uplink (port 24), and so it sends the packet down ports 1-23, skipping 24.
+                
+                The packet goes out port 15, makes that neat little hairpin turn, and arrives back at the switch on port 16 at nearly the same time. Assuming it's a broadcast, multicast, or a still-unknown unicast address, we're right back where we started: the switch has to take THIS packet, then, and flood it out to all of its ports less the source port. It gets sent to 1-15 and 17-24, skipping 16. Hold that thought right there for now.
+                
+                Back up in time a few nanoseconds. That packet ALSO went out port 16, made the hairpin turn, passing itself going the other direction (possibly on the same wires, if in in full-duplex mode), and showed up back at the switch on port 15. At that point, the switch proceeded to flood it out to 1-14 and 16-24.
+                
+                So you see, every time the packet leaves 15, it arrives at 16, and every time it leaves 16, it arrives at 15. If this was a one-way situation, you'd "merely" have a train of packets flying around forever, never dying, because there's no such thing as a TTL at this layer of your network. But, since it's happening in both directions, you actually get double the fun.
+                
+                None of these packets stop being forwarded, and new ones show up, so before long, your switch is doing nothing but spraying those frames everywhere just as fast as it can. Eventually you starve out all other traffic, and everything probably grinds to a halt.
+                
+                Eventually, the organization learns about things like switches, STP, 802.1x, and not having massive broadcast domains, and that crazy chapter of their history ends. However, just down the street, yet another company is waiting to add it to their own history.
+                
+                So, here's a challenge for anyone who's managed to get this far: pick a nice quiet time outside of business hours, declare a maintenance window, then go deliberately loop back some Ethernet ports. Look in offices, conference rooms, and on the backs of things like VOIP phones. Be creative. See if your network actually survives it.
+                
+                Or, you know, don't. If you don't test it, someone else will do it for you... eventually. They won't wait for a quiet time and won't declare a maintenance window, and they sure won't know to unplug it when things go sideways, but that's life, right?
+                
+                Oh, finally, don't forget to go back to that nice person and tell them that they are okay to plug their machine back in, power it up, and re-enable the network. Then also tell them they didn't cause the whole business to tank for multiple hours, because they might be sweating bullets that somehow the whole thing will land on their head and poison their next performance review.
+                
+                People deserve to know when they didn't cause a problem, particularly when they think they did! Don't forget that.
+                
+                More writing | Contact / send feedback
+        </p>
+        <a href = "http://localhost:8000" style="text-align:end;">Back</a>
+</body>
+</html>
+
+
