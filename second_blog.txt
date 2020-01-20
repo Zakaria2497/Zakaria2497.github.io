@@ -1,30 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Story</title>
-    <link rel="stylesheet" type="text/css" href="first.css">
-</head>
-
-
-
-
-<body>
-        <div class="main">
-
-
-                <div class="header">
-                        <h1 style="color:blue;text-align:center;">That packet looks familiar, and that one, and that one</h1>
-                        <p id = "date"style="text-align: right;">
-                        <time>Wednesday, January 15, 2020</time>
-                        </p>
-                </div>            
-
-         <section class="text">
-       
-                Sometimes I tell stories about service outages from the point of view of it having already happened, and provide this kind of "omniscient narrator" perspective as it goes along. I can tell you to look out for things, since they'll come in handy later, and so on.
+ Sometimes I tell stories about service outages from the point of view of it having already happened, and provide this kind of "omniscient narrator" perspective as it goes along. I can tell you to look out for things, since they'll come in handy later, and so on.
 
                 Other times, I try to present them in much the same way that they happened, complete with the whole "fog of war" thing that goes with being in the moment. This is where you can't see obvious things that are right in front of you because they seem too ridiculous to contemplate.
                 
@@ -95,10 +69,3 @@
                 People deserve to know when they didn't cause a problem, particularly when they think they did! Don't forget that.
                 
                 More writing | Contact / send feedback
-        </section>
-        </div>
-        <a href = "/" style="text-align:end;">Back</a>
-</body>
-</html>
-
-
