@@ -1,0 +1,22 @@
+Typography is the at and technique of arranging type to make written language legible, readable and appealing when displayed.
+the arrangement of stype invollves selecting typefaces, point sizes,line lengtth , line spacing(leading) and letter-spacing(tracking)
+and adjusting the space betweet pairs of letters(kerning).
+
+
+
+General practices for good typography:
+
+    1. Use line-space between 1.2x to 1.5x to font size.
+
+    2. Use between 40 to 70 characters per line.
+
+    3. In doubt align left.
+
+    4. Font size 12px size is too small 14-25px size is better.
+
+    5. 
+
+
+
+    HTML FONT PROPERTIES:
+        
